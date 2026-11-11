@@ -1,0 +1,692 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0" />
+  <title>Solar1Energy — O&M Maintenance Tracking System</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Sarabun:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: { sans: ['Sarabun', 'Inter', 'sans-serif'] },
+          colors: {
+            navy: { 900: '#0F172A', 800: '#1E293B', 700: '#334155' },
+            solar: { 600: '#D97706', 500: '#F59E0B', 100: '#FEF3C7', 50: '#FFFBEB' },
+            eco: { 600: '#16A34A', 100: '#DCFCE7', 50: '#F0FDF4' }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    body { font-family: 'Sarabun', 'Inter', sans-serif; background-color: #F8FAFC; color: #0F172A; }
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: #F1F5F9; }
+    ::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 3px; }
+    @media print {
+      @page { size: A4 portrait; margin: 10mm; }
+      body { background: #FFFFFF !important; color: #0F172A !important; -webkit-print-color-adjust: exact !important; }
+      .no-print { display: none !important; }
+      #printModal { position: static !important; display: block !important; background: transparent !important; padding: 0 !important; overflow: visible !important; }
+      #printA4Sheet { box-shadow: none !important; border: none !important; width: 100% !important; max-width: 100% !important; margin: 0 !important; padding: 0 !important; }
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col pb-24 lg:pb-10">
+
+  <header class="bg-navy-900 text-white border-b border-navy-800 sticky top-0 z-30 no-print shadow-md">
+    <div class="max-w-[1600px] mx-auto px-4 sm:px-6 py-3 flex flex-wrap items-center justify-between gap-3">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-lg bg-solar-600 flex items-center justify-center shadow-inner font-bold text-white text-lg tracking-tighter">S1</div>
+        <div>
+          <div class="flex items-center gap-2">
+            <h1 class="font-bold text-base sm:text-lg tracking-tight text-white">SOLAR1ENERGY</h1>
+            <span class="text-[11px] font-semibold uppercase px-2 py-0.5 rounded bg-solar-600 text-white">O&M System</span>
+          </div>
+          <p class="text-xs text-slate-300 hidden sm:block">ระบบบริหารและติดตามงานซ่อมบำรุงโซล่าเซลล์ (MaintenanceTracker)</p>
+        </div>
+      </div>
+      <div class="flex items-center gap-2 sm:gap-3">
+        <nav class="hidden lg:flex items-center bg-navy-800 p-1 rounded-lg border border-slate-700">
+          <button onclick="switchView('admin')" id="navDesktop-admin" class="px-3.5 py-1.5 rounded-md text-xs font-semibold transition-all bg-solar-600 text-white">ศูนย์ควบคุม O&M (Admin)</button>
+          <button onclick="switchView('customer')" id="navDesktop-customer" class="px-3.5 py-1.5 rounded-md text-xs font-semibold transition-all text-slate-300 hover:text-white">ลูกค้าตรวจสอบสถานะ (Customer)</button>
+          <button onclick="switchView('tech')" id="navDesktop-tech" class="px-3.5 py-1.5 rounded-md text-xs font-semibold transition-all text-slate-300 hover:text-white">ระบบทีมช่าง (Technician)</button>
+        </nav>
+        <button onclick="fetchJobs()" class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-navy-800 hover:bg-slate-700 border border-slate-700 text-xs font-medium text-slate-200 transition">
+          <svg class="w-4 h-4 text-solar-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+          <span id="syncStatusText">ซิงค์ข้อมูล</span>
+        </button>
+        <button onclick="openConfigModal()" class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-navy-800 hover:bg-slate-700 border border-slate-700 text-xs font-medium text-slate-200 transition">
+          <span id="connDot" class="w-2 h-2 rounded-full bg-amber-500"></span>
+          <span>ตั้งค่า API</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main class="flex-1 max-w-[1600px] w-full mx-auto px-3 sm:px-6 py-5 no-print">
+    <!-- VIEW 1: ADMIN -->
+    <section id="view-admin" class="space-y-5">
+      <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+        <div class="bg-white rounded-xl p-4 border border-slate-200 shadow-sm flex flex-col justify-between"><span class="text-xs font-semibold text-slate-500">ใบงานทั้งหมด</span><span id="kpi-total" class="text-2xl font-bold text-navy-900 mt-2">0</span></div>
+        <div class="bg-white rounded-xl p-4 border-l-4 border-l-amber-500 border border-slate-200 shadow-sm flex flex-col justify-between"><span class="text-xs font-semibold text-amber-700">รอดำเนินการ</span><span id="kpi-pending" class="text-2xl font-bold text-amber-600 mt-2">0</span></div>
+        <div class="bg-white rounded-xl p-4 border-l-4 border-l-blue-600 border border-slate-200 shadow-sm flex flex-col justify-between"><span class="text-xs font-semibold text-blue-700">จ่ายงานให้ช่างแล้ว</span><span id="kpi-assigned" class="text-2xl font-bold text-blue-600 mt-2">0</span></div>
+        <div class="bg-white rounded-xl p-4 border-l-4 border-l-indigo-600 border border-slate-200 shadow-sm flex flex-col justify-between"><span class="text-xs font-semibold text-indigo-700">กำลังซ่อมบำรุง</span><span id="kpi-inprogress" class="text-2xl font-bold text-indigo-600 mt-2">0</span></div>
+        <div class="col-span-2 sm:col-span-1 bg-white rounded-xl p-4 border-l-4 border-l-eco-600 border border-slate-200 shadow-sm flex flex-col justify-between"><span class="text-xs font-semibold text-eco-600">เสร็จสิ้น</span><span id="kpi-completed" class="text-2xl font-bold text-eco-600 mt-2">0</span></div>
+      </div>
+
+      <div class="bg-white rounded-xl p-4 border border-slate-200 shadow-sm flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
+        <div class="flex flex-1 flex-col sm:flex-row gap-2.5">
+          <input type="text" id="adminSearchInput" oninput="renderAdminJobs()" placeholder="ค้นหา Job ID, ชื่อลูกค้า, เบอร์โทร..." class="flex-1 px-3 py-2 text-sm rounded-lg border border-slate-300 focus:outline-none focus:border-solar-600" />
+          <select id="adminStatusFilter" onchange="renderAdminJobs()" class="px-3 py-2 text-sm rounded-lg border border-slate-300 bg-white text-navy-900">
+            <option value="ALL">ทุกสถานะงาน (ทั้งหมด)</option>
+            <option value="รอดำเนินการ">รอดำเนินการ</option>
+            <option value="จ่ายงานให้ช่างแล้ว">จ่ายงานให้ช่างแล้ว</option>
+            <option value="กำลังซ่อมบำรุง">กำลังซ่อมบำรุง</option>
+            <option value="เสร็จสิ้น">เสร็จสิ้น</option>
+          </select>
+        </div>
+        <button onclick="openJobModal()" class="flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-solar-600 hover:bg-solar-500 text-white font-semibold text-sm transition">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
+          <span>เปิดใบงานซ่อมบำรุงใหม่</span>
+        </button>
+      </div>
+
+      <div id="adminMobileCards" class="grid grid-cols-1 md:grid-cols-2 gap-3 lg:hidden"></div>
+
+      <div class="hidden lg:block bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+        <div class="px-4 py-3 bg-navy-900 text-white text-xs font-semibold">ตารางฐานข้อมูล Google Sheets (แท็บ MaintenanceTracker)</div>
+        <div class="overflow-x-auto">
+          <table class="w-full text-left border-collapse text-xs">
+            <thead>
+              <tr class="bg-slate-100 text-navy-800 border-b border-slate-200 font-semibold whitespace-nowrap">
+                <th class="py-3 px-3">A: Job ID</th><th class="py-3 px-3">B: วันที่แจ้ง</th><th class="py-3 px-3">C: ชื่อลูกค้า</th><th class="py-3 px-3">D: อีเมล</th><th class="py-3 px-3">E: เบอร์โทร</th><th class="py-3 px-3 min-w-[180px]">F: อาการเสีย</th><th class="py-3 px-3">G: สถานะ</th><th class="py-3 px-3">H: ช่าง</th><th class="py-3 px-3">I: อีเมลช่าง</th><th class="py-3 px-3">J: LINE ช่าง</th><th class="py-3 px-3">K: LINE ลูกค้า</th><th class="py-3 px-3 min-w-[180px]">L: ผลการซ่อม</th><th class="py-3 px-3">M: รูปก่อน</th><th class="py-3 px-3">N: รูปหลัง</th><th class="py-3 px-3">O: Log</th><th class="py-3 px-3 text-center">จัดการ</th>
+              </tr>
+            </thead>
+            <tbody id="adminDesktopTableBody" class="divide-y divide-slate-200"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- VIEW 2: CUSTOMER -->
+    <section id="view-customer" class="hidden max-w-4xl mx-auto space-y-5">
+      <div class="bg-navy-900 rounded-2xl p-6 sm:p-8 text-white shadow-md border border-navy-800">
+        <h2 class="text-xl sm:text-2xl font-bold">ติดตามสถานะงานซ่อมบำรุงโซล่าเซลล์</h2>
+        <p class="text-xs sm:text-sm text-slate-300 mt-1">กรอกรหัสใบงาน หรือเบอร์โทรศัพท์ เพื่อตรวจสอบความคืบหน้าและดาวน์โหลดใบรับประกัน</p>
+        <div class="mt-4 flex flex-col sm:flex-row gap-2.5">
+          <input type="text" id="customerQueryInput" placeholder="ระบุรหัสใบงาน หรือ เบอร์โทรศัพท์..." class="flex-1 px-4 py-2.5 rounded-lg bg-white text-navy-900 text-sm font-medium focus:outline-none" />
+          <button onclick="searchCustomerJobs()" class="px-6 py-2.5 rounded-lg bg-solar-600 hover:bg-solar-500 text-white font-semibold text-sm transition">ค้นหาข้อมูล</button>
+        </div>
+      </div>
+      <div id="customerResultsContainer" class="space-y-4"></div>
+    </section>
+
+    <!-- VIEW 3: TECH -->
+    <section id="view-tech" class="hidden space-y-5">
+      <div class="bg-white rounded-xl p-4 border border-slate-200 shadow-sm flex items-center justify-between gap-3">
+        <div>
+          <h2 class="text-lg font-bold text-navy-900">ระบบปฏิบัติการทีมช่างหน้างาน</h2>
+          <p class="text-xs text-slate-500">อัปเดตผลการซ่อม แนบรูปภาพ และกดปิดงานส่งมอบ</p>
+        </div>
+        <select id="techFilterSelect" onchange="renderTechJobs()" class="px-3 py-2 text-sm rounded-lg border border-slate-300 bg-white font-medium">
+          <option value="ACTIVE">งานที่ต้องดำเนินการ</option>
+          <option value="ALL">ทั้งหมด</option>
+          <option value="เสร็จสิ้น">เสร็จสิ้นแล้ว</option>
+        </select>
+      </div>
+      <div id="techCardsContainer" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4"></div>
+    </section>
+  </main>
+
+  <nav class="lg:hidden fixed bottom-3 inset-x-3 bg-navy-900/95 backdrop-blur-md text-white rounded-2xl shadow-xl border border-slate-700 z-40 px-2 py-1.5 flex items-center justify-around no-print">
+    <button onclick="switchView('admin')" id="navMobile-admin" class="flex-1 py-1.5 rounded-xl flex flex-col items-center justify-center gap-0.5 text-solar-500 font-semibold text-[11px]">แอดมิน O&M</button>
+    <button onclick="switchView('customer')" id="navMobile-customer" class="flex-1 py-1.5 rounded-xl flex flex-col items-center justify-center gap-0.5 text-slate-300 font-medium text-[11px]">ลูกค้าเช็คงาน</button>
+    <button onclick="switchView('tech')" id="navMobile-tech" class="flex-1 py-1.5 rounded-xl flex flex-col items-center justify-center gap-0.5 text-slate-300 font-medium text-[11px]">ระบบทีมช่าง</button>
+  </nav>
+
+  <!-- MODAL: JOB FORM -->
+  <div id="jobModal" class="fixed inset-0 bg-navy-900/70 z-50 hidden items-center justify-center p-3 overflow-y-auto no-print">
+    <div class="bg-white rounded-2xl max-w-4xl w-full shadow-2xl border border-slate-200 overflow-hidden my-8">
+      <div class="bg-navy-900 text-white px-5 py-4 flex items-center justify-between">
+        <h3 id="jobModalTitle" class="font-bold text-base">เปิดใบงานซ่อมบำรุงใหม่</h3>
+        <button onclick="closeJobModal()" class="text-slate-400 hover:text-white">✕</button>
+      </div>
+      <form id="jobForm" onsubmit="saveJobForm(event)" class="p-5 space-y-4 max-h-[80vh] overflow-y-auto text-sm">
+        <input type="hidden" id="formMode" value="create" />
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div><label class="block text-xs font-semibold text-slate-600 mb-1">A: Job ID</label><input type="text" id="f_jobId" readonly class="w-full px-3 py-2 rounded-lg bg-slate-100 border border-slate-300 font-mono text-xs font-bold" /></div>
+          <div><label class="block text-xs font-semibold text-slate-600 mb-1">B: วันที่แจ้ง</label><input type="text" id="f_reportDate" required class="w-full px-3 py-2 rounded-lg border border-slate-300" /></div>
+          <div><label class="block text-xs font-semibold text-slate-600 mb-1">G: สถานะงาน</label><select id="f_status" class="w-full px-3 py-2 rounded-lg border border-slate-300 bg-white font-semibold"><option value="รอดำเนินการ">รอดำเนินการ</option><option value="จ่ายงานให้ช่างแล้ว">จ่ายงานให้ช่างแล้ว</option><option value="กำลังซ่อมบำรุง">กำลังซ่อมบำรุง</option><option value="เสร็จสิ้น">เสร็จสิ้น</option></select></div>
+        </div>
+        <div class="p-3.5 rounded-xl bg-slate-50 border border-slate-200 space-y-3">
+          <h4 class="text-xs font-bold uppercase text-navy-800">ข้อมูลลูกค้า</h4>
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            <div><label class="block text-xs text-slate-600 mb-1">C: ชื่อลูกค้า *</label><input type="text" id="f_customerName" required class="w-full px-3 py-2 rounded-lg border border-slate-300 bg-white" /></div>
+            <div><label class="block text-xs text-slate-600 mb-1">E: เบอร์โทร *</label><input type="text" id="f_phone" required class="w-full px-3 py-2 rounded-lg border border-slate-300 bg-white" /></div>
+            <div><label class="block text-xs text-slate-600 mb-1">D: อีเมล</label><input type="email" id="f_customerEmail" class="w-full px-3 py-2 rounded-lg border border-slate-300 bg-white" /></div>
+            <div><label class="block text-xs text-slate-600 mb-1">K: LINE ลูกค้า</label><input type="text" id="f_lineCustomer" class="w-full px-3 py-2 rounded-lg border border-slate-300 bg-white font-mono text-xs" /></div>
+          </div>
+        </div>
+        <div><label class="block text-xs font-semibold text-slate-600 mb-1">F: อาการเสีย *</label><textarea id="f_issue" rows="2" required class="w-full px-3 py-2 rounded-lg border border-slate-300"></textarea></div>
+        <div class="p-3.5 rounded-xl bg-slate-50 border border-slate-200 space-y-3">
+          <h4 class="text-xs font-bold uppercase text-navy-800">ทีมช่าง</h4>
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div><label class="block text-xs text-slate-600 mb-1">H: ชื่อช่าง</label><input type="text" id="f_techName" class="w-full px-3 py-2 rounded-lg border border-slate-300 bg-white" /></div>
+            <div><label class="block text-xs text-slate-600 mb-1">I: อีเมลช่าง</label><input type="email" id="f_techEmail" class="w-full px-3 py-2 rounded-lg border border-slate-300 bg-white" /></div>
+            <div><label class="block text-xs text-slate-600 mb-1">J: LINE ช่าง</label><input type="text" id="f_lineTech" class="w-full px-3 py-2 rounded-lg border border-slate-300 bg-white font-mono text-xs" /></div>
+          </div>
+        </div>
+        <div class="space-y-3">
+          <div><label class="block text-xs font-semibold text-slate-600 mb-1">L: หมายเหตุ / ผลการซ่อม</label><textarea id="f_repairResult" rows="2" class="w-full px-3 py-2 rounded-lg border border-slate-300"></textarea></div>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div><label class="block text-xs font-semibold text-slate-600 mb-1">M: รูปก่อนซ่อม (URL)</label><input type="url" id="f_beforeImg" class="w-full px-3 py-2 rounded-lg border border-slate-300 text-xs" /></div>
+            <div><label class="block text-xs font-semibold text-slate-600 mb-1">N: รูปหลังซ่อม (URL)</label><input type="url" id="f_afterImg" class="w-full px-3 py-2 rounded-lg border border-slate-300 text-xs" /></div>
+          </div>
+          <div><label class="block text-xs font-semibold text-slate-500 mb-1">O: System Log</label><input type="text" id="f_systemLog" readonly class="w-full px-3 py-1.5 rounded-lg bg-slate-100 border border-slate-200 font-mono text-xs text-slate-600" /></div>
+        </div>
+        <div class="pt-3 border-t border-slate-200 flex justify-end gap-2">
+          <button type="button" onclick="closeJobModal()" class="px-4 py-2 rounded-lg border border-slate-300 text-slate-700">ยกเลิก</button>
+          <button type="submit" class="px-5 py-2 rounded-lg bg-solar-600 hover:bg-solar-500 text-white font-semibold">บันทึกข้อมูลลงระบบ</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: PRINT A4 -->
+  <div id="printModal" class="fixed inset-0 bg-navy-900/75 z-50 hidden items-start justify-center p-3 sm:p-6 overflow-y-auto">
+    <div class="w-full max-w-[210mm] my-4">
+      <div class="bg-navy-900 text-white px-4 py-3 rounded-t-xl flex items-center justify-between no-print border-b border-slate-700">
+        <span class="text-xs sm:text-sm font-semibold">ใบส่งมอบงานและใบรับประกัน (A4)</span>
+        <div class="flex items-center gap-2">
+          <button onclick="clearSignatures()" class="px-3 py-1.5 rounded-lg bg-slate-700 text-xs">ล้างลายเซ็น</button>
+          <button onclick="window.print()" class="px-4 py-1.5 rounded-lg bg-solar-600 text-white text-xs font-bold">พิมพ์ PDF</button>
+          <button onclick="closePrintModal()" class="px-3 py-1.5 rounded-lg bg-slate-800 text-xs">ปิด</button>
+        </div>
+      </div>
+      <div id="printA4Sheet" class="bg-white text-navy-900 p-6 sm:p-8 shadow-2xl border border-slate-200 space-y-4 text-xs leading-relaxed">
+        <div class="flex items-start justify-between border-b-2 border-navy-900 pb-3">
+          <div class="flex items-center gap-3">
+            <div class="w-12 h-12 rounded-lg bg-navy-900 text-solar-500 flex items-center justify-center font-extrabold text-xl border-2 border-solar-600">S1</div>
+            <div>
+              <h2 class="text-base font-bold text-navy-900 uppercase">บริษัท โซล่าวัน เอ็นเนอร์ยี่ จำกัด</h2>
+              <p class="text-[11px] text-slate-600">ศูนย์บริการซ่อมบำรุงโซล่าเซลล์ (Solar O&M Service Center)</p>
+            </div>
+          </div>
+          <div class="text-right">
+            <span class="inline-block px-2.5 py-1 rounded bg-navy-900 text-white font-bold text-xs">ใบรับประกัน</span>
+            <p class="mt-1 font-mono font-bold text-sm text-solar-600" id="p_jobId">S1-MNT-2026001</p>
+            <p class="text-[11px] text-slate-500">วันที่: <span id="p_printDate"></span></p>
+          </div>
+        </div>
+        <div class="border border-slate-300 rounded-lg overflow-hidden">
+          <div class="bg-navy-900 text-white px-3 py-1.5 font-bold text-xs">ข้อมูลลูกค้าและรายละเอียด</div>
+          <table class="w-full text-xs border-collapse">
+            <tbody>
+              <tr class="border-b border-slate-200"><td class="py-2 px-3 font-semibold bg-slate-50 w-1/6">ชื่อลูกค้า</td><td class="py-2 px-3 w-2/6" id="p_customerName">-</td><td class="py-2 px-3 font-semibold bg-slate-50 w-1/6">วันที่แจ้ง</td><td class="py-2 px-3 w-2/6" id="p_reportDate">-</td></tr>
+              <tr class="border-b border-slate-200"><td class="py-2 px-3 font-semibold bg-slate-50">เบอร์โทร</td><td class="py-2 px-3" id="p_phone">-</td><td class="py-2 px-3 font-semibold bg-slate-50">อีเมล</td><td class="py-2 px-3" id="p_customerEmail">-</td></tr>
+              <tr class="border-b border-slate-200"><td class="py-2 px-3 font-semibold bg-slate-50">ช่างผู้ดูแล</td><td class="py-2 px-3" id="p_techName">-</td><td class="py-2 px-3 font-semibold bg-slate-50">สถานะ</td><td class="py-2 px-3 font-bold text-eco-600" id="p_status">-</td></tr>
+              <tr class="border-b border-slate-200"><td class="py-2 px-3 font-semibold bg-slate-50">อาการเสีย</td><td class="py-2 px-3" colspan="3" id="p_issue">-</td></tr>
+              <tr><td class="py-2 px-3 font-semibold bg-slate-50">ผลการซ่อม</td><td class="py-2 px-3" colspan="3" id="p_repairResult">-</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="border border-slate-300 rounded-lg overflow-hidden">
+          <div class="bg-navy-900 text-white px-3 py-1.5 font-bold text-xs">รูปภาพก่อน / หลังซ่อม</div>
+          <div class="grid grid-cols-2 gap-4 p-3">
+            <div class="border border-slate-200 rounded p-2 text-center"><p class="font-semibold text-[11px] mb-1">ก่อนซ่อม</p><img id="p_beforeImg" src="" class="w-full h-36 object-cover rounded bg-slate-100 mx-auto" /></div>
+            <div class="border border-slate-200 rounded p-2 text-center"><p class="font-semibold text-[11px] mb-1">หลังซ่อม</p><img id="p_afterImg" src="" class="w-full h-36 object-cover rounded bg-slate-100 mx-auto" /></div>
+          </div>
+        </div>
+        <div class="bg-solar-50 border-2 border-solar-600 rounded-lg p-3 flex items-center justify-between">
+          <div><h4 class="font-bold text-navy-900 text-xs">เงื่อนไขการรับประกัน 90 วัน</h4><p class="text-[11px] text-slate-700">รับประกันคุณภาพงานซ่อมและอะไหล่ 90 วันนับจากวันที่ส่งมอบ</p></div>
+          <div class="bg-white border border-solar-600 rounded px-3 py-1.5 text-right"><span class="block text-[10px] text-slate-500">วันหมดประกัน</span><span id="p_warrantyExpiry" class="font-bold text-sm text-solar-600">-</span></div>
+        </div>
+        <div class="grid grid-cols-2 gap-4 pt-1">
+          <div class="border border-slate-300 rounded-lg p-2 text-center"><p class="font-semibold text-[11px] mb-1">ลายเซ็นลูกค้า</p><canvas id="sigCanvasCustomer" width="320" height="90" class="w-full h-20 bg-slate-50 border border-dashed rounded"></canvas></div>
+          <div class="border border-slate-300 rounded-lg p-2 text-center"><p class="font-semibold text-[11px] mb-1">ลายเซ็นช่างผู้ส่งมอบ</p><canvas id="sigCanvasTech" width="320" height="90" class="w-full h-20 bg-slate-50 border border-dashed rounded"></canvas></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: NOTIFICATION PREVIEW & ACTION -->
+  <div id="notifyModal" class="fixed inset-0 bg-navy-900/70 backdrop-blur-xs z-50 hidden items-center justify-center p-3 sm:p-4 overflow-y-auto no-print">
+    <div class="bg-white rounded-2xl max-w-4xl w-full shadow-2xl border border-slate-200 overflow-hidden my-8">
+      <div class="bg-navy-900 text-white px-5 py-4 flex items-center justify-between">
+        <div>
+          <h3 class="font-bold text-base sm:text-lg">พรีวิวและส่งการแจ้งเตือน (Email & LINE Notification)</h3>
+          <p id="notifyModalSubtitle" class="text-xs text-slate-300"></p>
+        </div>
+        <button onclick="closeNotifyModal()" class="text-slate-400 hover:text-white p-1">✕</button>
+      </div>
+
+      <div class="p-5 space-y-4 max-h-[75vh] overflow-y-auto">
+        <div class="flex flex-wrap gap-2 border-b border-slate-200 pb-3">
+          <button onclick="switchNotifyParty('customer')" id="tabParty-customer" class="px-4 py-2 rounded-lg text-xs font-bold bg-solar-600 text-white">1. แจ้งเตือนลูกค้า (Customer)</button>
+          <button onclick="switchNotifyParty('om')" id="tabParty-om" class="px-4 py-2 rounded-lg text-xs font-bold bg-slate-100 text-navy-800 hover:bg-slate-200">2. แจ้งเตือนศูนย์ O&M (Company)</button>
+          <button onclick="switchNotifyParty('tech')" id="tabParty-tech" class="px-4 py-2 rounded-lg text-xs font-bold bg-slate-100 text-navy-800 hover:bg-slate-200">3. แจ้งเตือนทีมช่าง (Technician)</button>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <div class="border border-slate-200 rounded-xl overflow-hidden bg-slate-50">
+            <div class="bg-navy-800 text-white px-4 py-2 text-xs font-semibold flex justify-between"><span>ตัวอย่าง HTML Email</span><span id="emailTargetLabel" class="text-solar-500 font-mono"></span></div>
+            <div id="emailPreviewBody" class="p-4 text-xs space-y-2 bg-white m-3 rounded-lg border border-slate-200"></div>
+          </div>
+          <div class="border border-slate-200 rounded-xl overflow-hidden bg-slate-50">
+            <div class="bg-[#06C755] text-white px-4 py-2 text-xs font-semibold flex justify-between"><span>ตัวอย่าง LINE Message</span><span id="lineTargetLabel" class="font-mono text-white/90"></span></div>
+            <div class="p-4"><div id="linePreviewBody" class="bg-white p-3.5 rounded-xl border border-slate-200 text-xs whitespace-pre-line"></div></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="bg-slate-100 px-5 py-3 border-t border-slate-200 flex items-center justify-between">
+        <span class="text-xs text-slate-500">*ระบบจะทำการส่งอีเมลผ่าน Gmail และยิงข้อความเข้า LINE ตามเป้าหมายของฝ่ายที่เลือก</span>
+        <div class="flex gap-2">
+          <button onclick="closeNotifyModal()" class="px-4 py-2 rounded-lg border border-slate-300 text-slate-700 text-xs font-medium bg-white">ปิดหน้าต่าง</button>
+          <button onclick="sendRealNotification()" class="px-5 py-2 rounded-lg bg-eco-600 hover:bg-green-700 text-white font-bold text-xs shadow-sm flex items-center gap-1.5">
+            <span>🚀 กดส่งแจ้งเตือนทันที</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: CONFIG API -->
+  <div id="configModal" class="fixed inset-0 bg-navy-900/70 z-50 hidden items-center justify-center p-4 no-print">
+    <div class="bg-white rounded-2xl max-w-lg w-full shadow-2xl border border-slate-200 overflow-hidden">
+      <div class="bg-navy-900 text-white px-5 py-4 flex items-center justify-between"><h3 class="font-bold text-base">ตั้งค่า Web App URL</h3><button onclick="closeConfigModal()">✕</button></div>
+      <div class="p-5 space-y-4 text-sm">
+        <div><label class="block font-semibold mb-1">Web App URL (ลงท้ายด้วย /exec)</label><input type="url" id="gasUrlInput" class="w-full px-3 py-2 rounded-lg border font-mono text-xs" /></div>
+        <div class="flex justify-end gap-2 pt-2 border-t"><button onclick="closeConfigModal()" class="px-4 py-2 border rounded-lg">ปิด</button><button onclick="saveGasUrl()" class="px-5 py-2 bg-solar-600 text-white font-semibold rounded-lg">บันทึก</button></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="toastBox" class="fixed bottom-20 right-4 z-50 hidden bg-navy-900 text-white px-4 py-3 rounded-xl shadow-lg border-l-4 border-solar-500 text-xs font-medium"></div>
+
+  <script>
+    const STORAGE_KEY_GAS_URL = 'solar1_gas_url';
+    const STORAGE_KEY_LOCAL_JOBS = 'solar1_jobs_cache';
+    const DEFAULT_GAS_URL = 'https://script.google.com/macros/s/AKfycbzSolar1EnergyMaintenanceTrackerDefaultURL/exec';
+
+    let jobsData = [];
+    let currentNotifyJob = null;
+    let currentNotifyParty = 'customer';
+
+    function getGasUrl() {
+      let url = localStorage.getItem(STORAGE_KEY_GAS_URL);
+      if (!url) { url = DEFAULT_GAS_URL; localStorage.setItem(STORAGE_KEY_GAS_URL, url); }
+      return url;
+    }
+    function openConfigModal() { document.getElementById('gasUrlInput').value = getGasUrl(); document.getElementById('configModal').classList.remove('hidden'); document.getElementById('configModal').classList.add('flex'); }
+    function closeConfigModal() { document.getElementById('configModal').classList.add('hidden'); }
+    function saveGasUrl() {
+      const val = document.getElementById('gasUrlInput').value.trim();
+      if (val) { localStorage.setItem(STORAGE_KEY_GAS_URL, val); showToast('บันทึก URL สำเร็จ'); closeConfigModal(); fetchJobs(); }
+    }
+
+    function showToast(msg) {
+      const box = document.getElementById('toastBox');
+      box.textContent = msg; box.classList.remove('hidden');
+      clearTimeout(window._t); window._t = setTimeout(() => box.classList.add('hidden'), 3500);
+    }
+
+    function convertDriveUrl(url) {
+      if (!url || typeof url !== 'string') return '';
+      const m = url.match(/\/file\/d\/([a-zA-Z0-9_-]+)/) || url.match(/\/d\/([a-zA-Z0-9_-]+)/) || url.match(/[?&]id=([a-zA-Z0-9_-]+)/);
+      return (m && m[1] && url.includes('drive.google.com')) ? `https://lh3.googleusercontent.com/d/${m[1]}=w1000` : url.trim();
+    }
+
+    function getStatusBadgeHtml(status) {
+      const cls = status === 'เสร็จสิ้น' ? 'bg-eco-100 text-eco-600 border-green-300' : (status === 'กำลังซ่อมบำรุง' ? 'bg-indigo-100 text-indigo-800 border-indigo-300' : (status === 'จ่ายงานให้ช่างแล้ว' ? 'bg-blue-100 text-blue-800 border-blue-300' : 'bg-amber-100 text-amber-800 border-amber-300'));
+      return `<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold border ${cls}"><span class="w-1.5 h-1.5 rounded-full bg-current"></span>${status}</span>`;
+    }
+
+    function getTodayFormatted() {
+      const n = new Date();
+      return `${String(n.getDate()).padStart(2, '0')}/${String(n.getMonth() + 1).padStart(2, '0')}/${n.getFullYear()}`;
+    }
+
+    function getNowLogTimestamp(status) {
+      const n = new Date();
+      return `[SENT:${status}] ${String(n.getDate()).padStart(2, '0')}/${String(n.getMonth() + 1).padStart(2, '0')}/${n.getFullYear()} ${String(n.getHours()).padStart(2, '0')}:${String(n.getMinutes()).padStart(2, '0')}`;
+    }
+
+    function calculateWarrantyExpiry90Days(dateStr) {
+      let d = new Date();
+      if (dateStr && dateStr.includes('/')) {
+        const p = dateStr.split('/');
+        if (p.length === 3) d = new Date(parseInt(p[2]), parseInt(p[1]) - 1, parseInt(p[0]));
+      }
+      d.setDate(d.getDate() + 90);
+      return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
+    }
+
+    async function fetchJobs() {
+      const url = getGasUrl();
+      const syncText = document.getElementById('syncStatusText');
+      syncText.textContent = 'กำลังซิงค์...';
+      try {
+        const sep = url.includes('?') ? '&' : '?';
+        const res = await fetch(`${url}${sep}action=getJobs&sheet=MaintenanceTracker`, { method: 'GET', mode: 'cors' });
+        const json = await res.json();
+        const rows = Array.isArray(json) ? json : (json.data || []);
+        if (rows.length > 0) {
+          jobsData = rows.map(r => ({
+            jobId: String(r.jobId || ''), reportDate: String(r.reportDate || ''), customerName: String(r.customerName || ''),
+            customerEmail: String(r.customerEmail || ''), phone: String(r.phone || ''), issue: String(r.issue || ''),
+            status: String(r.status || 'รอดำเนินการ'), techName: String(r.techName || ''), techEmail: String(r.techEmail || ''),
+            lineTech: String(r.lineTech || ''), lineCustomer: String(r.lineCustomer || ''), repairResult: String(r.repairResult || ''),
+            beforeImg: String(r.beforeImg || ''), afterImg: String(r.afterImg || ''), systemLog: String(r.systemLog || '')
+          })).filter(r => r.jobId);
+          localStorage.setItem(STORAGE_KEY_LOCAL_JOBS, JSON.stringify(jobsData));
+        }
+        syncText.textContent = 'ซิงค์สำเร็จ';
+        document.getElementById('connDot').className = 'w-2 h-2 rounded-full bg-eco-600';
+        refreshAllViews();
+      } catch (err) {
+        syncText.textContent = 'โหมดออฟไลน์';
+        document.getElementById('connDot').className = 'w-2 h-2 rounded-full bg-amber-500';
+        const cached = localStorage.getItem(STORAGE_KEY_LOCAL_JOBS);
+        if (cached) { jobsData = JSON.parse(cached); refreshAllViews(); }
+      }
+    }
+
+    async function postJobAction(actionName, jobObj) {
+      localStorage.setItem(STORAGE_KEY_LOCAL_JOBS, JSON.stringify(jobsData));
+      refreshAllViews();
+      const url = getGasUrl();
+      if (url === DEFAULT_GAS_URL) return;
+
+      const payload = {
+        action: actionName,
+        sheetName: 'MaintenanceTracker',
+        rowValues: [
+          jobObj.jobId, jobObj.reportDate, jobObj.customerName, jobObj.customerEmail,
+          "'" + String(jobObj.phone).replace(/^'/, ''), jobObj.issue, jobObj.status,
+          jobObj.techName, jobObj.techEmail, jobObj.lineTech, jobObj.lineCustomer,
+          jobObj.repairResult, jobObj.beforeImg, jobObj.afterImg, jobObj.systemLog
+        ]
+      };
+      try {
+        await fetch(url, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(payload) });
+        showToast(`บันทึก ${jobObj.jobId} ลง Google Sheets เรียบร้อย`);
+      } catch (e) {
+        showToast(`บันทึกในเครื่องแล้ว (รอซิงค์อินเทอร์เน็ต)`);
+      }
+    }
+
+    function switchView(viewName) {
+      ['admin', 'customer', 'tech'].forEach(v => {
+        document.getElementById(`view-${v}`).classList.toggle('hidden', v !== viewName);
+        const dBtn = document.getElementById(`navDesktop-${v}`);
+        if (dBtn) dBtn.className = `px-3.5 py-1.5 rounded-md text-xs font-semibold transition-all ${v === viewName ? 'bg-solar-600 text-white' : 'text-slate-300 hover:text-white'}`;
+      });
+      refreshAllViews();
+    }
+
+    function refreshAllViews() {
+      const total = jobsData.length;
+      document.getElementById('kpi-total').textContent = total;
+      document.getElementById('kpi-pending').textContent = jobsData.filter(j => j.status === 'รอดำเนินการ').length;
+      document.getElementById('kpi-assigned').textContent = jobsData.filter(j => j.status === 'จ่ายงานให้ช่างแล้ว').length;
+      document.getElementById('kpi-inprogress').textContent = jobsData.filter(j => j.status === 'กำลังซ่อมบำรุง').length;
+      document.getElementById('kpi-completed').textContent = jobsData.filter(j => j.status === 'เสร็จสิ้น').length;
+      renderAdminJobs();
+      renderTechJobs();
+      if (document.getElementById('customerQueryInput').value.trim()) searchCustomerJobs();
+      else if (jobsData.length > 0) renderCustomerJobCards([jobsData[0]]);
+    }
+
+    function renderAdminJobs() {
+      const q = (document.getElementById('adminSearchInput').value || '').toLowerCase();
+      const sf = document.getElementById('adminStatusFilter').value;
+      const list = jobsData.filter(j => (sf === 'ALL' || j.status === sf) && (!q || `${j.jobId} ${j.customerName} ${j.phone} ${j.issue}`.toLowerCase().includes(q)));
+      
+      document.getElementById('adminMobileCards').innerHTML = list.length === 0 ? `<div class="bg-white p-6 text-center text-slate-500 rounded-xl">ไม่พบข้อมูล</div>` : list.map(j => `
+        <div class="bg-white p-4 rounded-xl border border-slate-200 space-y-3">
+          <div class="flex justify-between items-center"><span class="font-mono font-bold text-sm">${j.jobId}</span>${getStatusBadgeHtml(j.status)}</div>
+          <h3 class="font-bold text-base text-navy-900">${j.customerName}</h3>
+          <p class="text-xs text-slate-500">โทร: <a href="tel:${j.phone}" class="text-solar-600 font-semibold">${j.phone}</a></p>
+          <p class="text-xs text-slate-700 bg-slate-50 p-2 rounded"><b>อาการ:</b> ${j.issue}</p>
+          <div class="flex justify-between items-center pt-2 border-t">
+            <select onchange="quickChangeStatus('${j.jobId}', this.value)" class="text-xs px-2 py-1 rounded border bg-white font-semibold"><option value="รอดำเนินการ" ${j.status==='รอดำเนินการ'?'selected':''}>รอดำเนินการ</option><option value="จ่ายงานให้ช่างแล้ว" ${j.status==='จ่ายงานให้ช่างแล้ว'?'selected':''}>จ่ายงานให้ช่างแล้ว</option><option value="กำลังซ่อมบำรุง" ${j.status==='กำลังซ่อมบำรุง'?'selected':''}>กำลังซ่อมบำรุง</option><option value="เสร็จสิ้น" ${j.status==='เสร็จสิ้น'?'selected':''}>เสร็จสิ้น</option></select>
+            <div class="flex gap-1"><button onclick="openJobModal('${j.jobId}')" class="px-2 py-1 bg-slate-100 rounded text-xs">แก้ไข</button><button onclick="openNotifyModal('${j.jobId}')" class="px-2 py-1 bg-navy-800 text-white rounded text-xs">แจ้งเตือน</button><button onclick="openPrintModal('${j.jobId}')" class="px-2 py-1 bg-solar-600 text-white rounded text-xs">พิมพ์ A4</button></div>
+          </div>
+        </div>
+      `).join('');
+
+      document.getElementById('adminDesktopTableBody').innerHTML = list.length === 0 ? `<tr><td colspan="16" class="py-6 text-center text-slate-400">ไม่พบข้อมูล</td></tr>` : list.map(j => `
+        <tr class="hover:bg-slate-50 align-top">
+          <td class="py-3 px-3 font-mono font-bold">${j.jobId}</td><td class="py-3 px-3">${j.reportDate}</td><td class="py-3 px-3 font-semibold">${j.customerName}</td><td class="py-3 px-3">${j.customerEmail||'-'}</td><td class="py-3 px-3 font-mono">'${j.phone}</td><td class="py-3 px-3">${j.issue}</td>
+          <td class="py-3 px-3">${getStatusBadgeHtml(j.status)}<br><select onchange="quickChangeStatus('${j.jobId}', this.value)" class="text-[11px] mt-1 border rounded"><option value="รอดำเนินการ" ${j.status==='รอดำเนินการ'?'selected':''}>รอดำเนินการ</option><option value="จ่ายงานให้ช่างแล้ว" ${j.status==='จ่ายงานให้ช่างแล้ว'?'selected':''}>จ่ายงานให้ช่างแล้ว</option><option value="กำลังซ่อมบำรุง" ${j.status==='กำลังซ่อมบำรุง'?'selected':''}>กำลังซ่อมบำรุง</option><option value="เสร็จสิ้น" ${j.status==='เสร็จสิ้น'?'selected':''}>เสร็จสิ้น</option></select></td>
+          <td class="py-3 px-3">${j.techName||'-'}</td><td class="py-3 px-3">${j.techEmail||'-'}</td><td class="py-3 px-3 font-mono text-[11px]">${j.lineTech||'-'}</td><td class="py-3 px-3 font-mono text-[11px]">${j.lineCustomer||'-'}</td><td class="py-3 px-3">${j.repairResult||'-'}</td>
+          <td class="py-3 px-3">${j.beforeImg ? `<a href="${convertDriveUrl(j.beforeImg)}" target="_blank" class="text-solar-600 font-semibold underline">ดูรูป</a>`:'-'}</td>
+          <td class="py-3 px-3">${j.afterImg ? `<a href="${convertDriveUrl(j.afterImg)}" target="_blank" class="text-eco-600 font-semibold underline">ดูรูป</a>`:'-'}</td>
+          <td class="py-3 px-3 font-mono text-[11px] text-slate-500">${j.systemLog||'-'}</td>
+          <td class="py-3 px-3 text-center"><div class="flex justify-center gap-1"><button onclick="openJobModal('${j.jobId}')" class="px-2 py-1 bg-slate-100 rounded">แก้ไข</button><button onclick="openNotifyModal('${j.jobId}')" class="px-2 py-1 bg-navy-800 text-white rounded">แจ้งเตือน</button><button onclick="openPrintModal('${j.jobId}')" class="px-2 py-1 bg-solar-600 text-white rounded">พิมพ์</button></div></td>
+        </tr>
+      `).join('');
+    }
+
+    function quickChangeStatus(jobId, st) {
+      const j = jobsData.find(x => x.jobId === jobId);
+      if (j) { j.status = st; j.systemLog = getNowLogTimestamp(st); postJobAction('updateJob', j); }
+    }
+
+    function openNotifyModal(jobId) {
+      const job = jobsData.find(j => j.jobId === jobId);
+      if (!job) return;
+      currentNotifyJob = job;
+      document.getElementById('notifyModalSubtitle').textContent = `รหัสใบงาน: ${job.jobId} | ลูกค้า: ${job.customerName} | สถานะ: ${job.status}`;
+      switchNotifyParty('customer');
+      document.getElementById('notifyModal').classList.remove('hidden');
+      document.getElementById('notifyModal').classList.add('flex');
+    }
+    function closeNotifyModal() { document.getElementById('notifyModal').classList.add('hidden'); }
+
+    function switchNotifyParty(party) {
+      currentNotifyParty = party;
+      ['customer', 'om', 'tech'].forEach(p => {
+        document.getElementById(`tabParty-${p}`).className = `px-4 py-2 rounded-lg text-xs font-bold ${p === party ? 'bg-solar-600 text-white' : 'bg-slate-100 text-navy-800'}`;
+      });
+      const job = currentNotifyJob;
+      if (!job) return;
+      const expiry = calculateWarrantyExpiry90Days(job.reportDate);
+      if (party === 'customer') {
+        document.getElementById('emailTargetLabel').textContent = `To: ${job.customerEmail || '-'}`;
+        document.getElementById('lineTargetLabel').textContent = `LINE: ${job.lineCustomer || '-'}`;
+        document.getElementById('emailPreviewBody').innerHTML = `<b>เรียน ${job.customerName}</b><br>แจ้งสถานะใบงาน ${job.jobId} : <b>${job.status}</b><br>อาการ: ${job.issue}<br>ผลซ่อม: ${job.repairResult || '-'}<br>รับประกันถึง: ${expiry}`;
+        document.getElementById('linePreviewBody').textContent = `🔔 แจ้งเตือนสถานะ Solar1Energy\n📋 Job ID: ${job.jobId}\n📌 สถานะ: ${job.status}\n🛡 รับประกันถึง: ${expiry}`;
+      } else if (party === 'om') {
+        document.getElementById('emailTargetLabel').textContent = `To: admin@solar1energy.com`;
+        document.getElementById('lineTargetLabel').textContent = `LINE Group: O&M HQ`;
+        document.getElementById('emailPreviewBody').innerHTML = `<b>[O&M Log]</b> ใบงาน ${job.jobId} เปลี่ยนสถานะเป็น <b>${job.status}</b><br>ลูกค้า: ${job.customerName} (${job.phone})`;
+        document.getElementById('linePreviewBody').textContent = `🏢 [O&M HQ]\n🆔 ${job.jobId} | ${job.status}\n👤 ${job.customerName} (${job.phone})`;
+      } else {
+        document.getElementById('emailTargetLabel').textContent = `To: ${job.techEmail || '-'}`;
+        document.getElementById('lineTargetLabel').textContent = `LINE: ${job.lineTech || '-'}`;
+        document.getElementById('emailPreviewBody').innerHTML = `<b>เรียน ${job.techName || 'ช่าง'}</b><br>มอบหมายงาน #${job.jobId} ลูกค้า ${job.customerName}<br>โทร: ${job.phone}<br>อาการ: ${job.issue}`;
+        document.getElementById('linePreviewBody').textContent = `🛠 [งานช่าง]\n📋 Job ID: ${job.jobId}\n👤 ${job.customerName}\n📞 ${job.phone}\n⚡ ${job.issue}`;
+      }
+    }
+
+    async function sendRealNotification() {
+      const url = getGasUrl();
+      if (url === DEFAULT_GAS_URL) { showToast('กรุณาตั้งค่า Web App URL ก่อน'); openConfigModal(); return; }
+      showToast('กำลังส่งการแจ้งเตือน...');
+      try {
+        const res = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body: JSON.stringify({ action: 'sendNotification', party: currentNotifyParty, jobData: currentNotifyJob })
+        });
+        const resJson = await res.json();
+        if (resJson.status === 'success') { showToast('ส่งการแจ้งเตือนสำเร็จ!'); closeNotifyModal(); }
+        else { showToast('เกิดข้อผิดพลาด: ' + (resJson.message || '')); }
+      } catch (e) { showToast('ส่งคำสั่งแจ้งเตือนไปที่ระบบเรียบร้อยแล้ว'); closeNotifyModal(); }
+    }
+
+    function searchCustomerJobs() {
+      const q = (document.getElementById('customerQueryInput').value || '').trim().toLowerCase();
+      if (!q) { if (jobsData.length > 0) renderCustomerJobCards([jobsData[0]]); return; }
+      renderCustomerJobCards(jobsData.filter(j => j.jobId.toLowerCase().includes(q) || j.phone.includes(q)));
+    }
+
+    function renderCustomerJobCards(list) {
+      const steps = ['รอดำเนินการ', 'จ่ายงานให้ช่างแล้ว', 'กำลังซ่อมบำรุง', 'เสร็จสิ้น'];
+      document.getElementById('customerResultsContainer').innerHTML = list.length === 0 ? `<div class="bg-white p-6 text-center rounded-xl">ไม่พบข้อมูลใบงาน</div>` : list.map(j => {
+        const cur = Math.max(0, steps.indexOf(j.status));
+        return `
+          <div class="bg-white rounded-2xl p-6 border shadow-sm space-y-4">
+            <div class="flex justify-between items-center border-b pb-3">
+              <div><span class="font-mono font-bold text-solar-600">${j.jobId}</span><h3 class="font-bold text-lg text-navy-900">${j.customerName}</h3></div>
+              <button onclick="openPrintModal('${j.jobId}')" class="px-4 py-2 bg-navy-900 text-white rounded-lg text-xs font-semibold">ดาวน์โหลดใบรับประกัน (A4)</button>
+            </div>
+            <div class="p-3 bg-slate-50 rounded-xl flex justify-between text-center">
+              ${steps.map((st, i) => `<div class="flex-1"><div class="w-7 h-7 mx-auto rounded-full border-2 flex items-center justify-center text-xs font-bold ${i <= cur ? 'bg-solar-600 text-white border-solar-600' : 'bg-white text-slate-400'}">${i <= cur ? '✓' : i+1}</div><span class="text-[11px] mt-1 block">${st}</span></div>`).join('')}
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+              <div class="p-3 bg-slate-50 rounded-xl"><b>อาการเสีย:</b> ${j.issue}<br><span class="text-xs text-slate-500 mt-2 block">ช่าง: ${j.techName || 'รอจัดสรร'}</span></div>
+              <div class="p-3 bg-eco-50 rounded-xl"><b>ผลการซ่อม:</b> ${j.repairResult || 'กำลังดำเนินการ'}<br><span class="text-xs text-eco-600 font-semibold mt-2 block">รับประกัน 90 วัน (ถึง ${calculateWarrantyExpiry90Days(j.reportDate)})</span></div>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function renderTechJobs() {
+      const mode = document.getElementById('techFilterSelect').value;
+      const list = jobsData.filter(j => mode === 'ALL' || (mode === 'ACTIVE' ? j.status !== 'เสร็จสิ้น' : j.status === 'เสร็จสิ้น'));
+      document.getElementById('techCardsContainer').innerHTML = list.length === 0 ? `<div class="bg-white p-6 text-center rounded-xl col-span-full">ไม่มีงานในระบบ</div>` : list.map(j => `
+        <div class="bg-white rounded-2xl p-5 border shadow-sm space-y-3">
+          <div class="flex justify-between"><span class="font-mono font-bold text-solar-600">${j.jobId}</span>${getStatusBadgeHtml(j.status)}</div>
+          <h3 class="font-bold text-navy-900">${j.customerName}</h3>
+          <a href="tel:${j.phone}" class="block py-2 text-center bg-slate-100 rounded-lg text-xs font-semibold">📞 โทร: ${j.phone}</a>
+          <p class="text-xs bg-amber-50 p-2 rounded"><b>อาการ:</b> ${j.issue}</p>
+          <div class="space-y-2 pt-2 text-xs">
+            <textarea id="tr_${j.jobId}" rows="2" class="w-full p-2 border rounded" placeholder="บันทึกผลการซ่อม...">${j.repairResult||''}</textarea>
+            <input type="url" id="tb_${j.jobId}" value="${j.beforeImg||''}" placeholder="ลิงก์รูปก่อนซ่อม" class="w-full p-2 border rounded text-xs" />
+            <input type="url" id="ta_${j.jobId}" value="${j.afterImg||''}" placeholder="ลิงก์รูปหลังซ่อม" class="w-full p-2 border rounded text-xs" />
+          </div>
+          <div class="flex gap-2 pt-2 border-t">
+            <button onclick="saveTech('${j.jobId}', 'กำลังซ่อมบำรุง')" class="flex-1 py-2 bg-indigo-600 text-white rounded-lg text-xs font-semibold">กำลังซ่อม</button>
+            <button onclick="saveTech('${j.jobId}', 'เสร็จสิ้น')" class="flex-1 py-2 bg-eco-600 text-white rounded-lg text-xs font-bold">ปิดงาน</button>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function saveTech(jobId, st) {
+      const j = jobsData.find(x => x.jobId === jobId);
+      if (j) {
+        j.repairResult = document.getElementById(`tr_${jobId}`).value.trim();
+        j.beforeImg = document.getElementById(`tb_${jobId}`).value.trim();
+        j.afterImg = document.getElementById(`ta_${jobId}`).value.trim();
+        j.status = st; j.systemLog = getNowLogTimestamp(st);
+        postJobAction('updateJob', j);
+      }
+    }
+
+    function openJobModal(id = null) {
+      if (id) {
+        const j = jobsData.find(x => x.jobId === id);
+        document.getElementById('formMode').value = 'edit';
+        document.getElementById('jobModalTitle').textContent = `แก้ไขใบงาน: ${j.jobId}`;
+        document.getElementById('f_jobId').value = j.jobId;
+        document.getElementById('f_reportDate').value = j.reportDate;
+        document.getElementById('f_status').value = j.status;
+        document.getElementById('f_customerName').value = j.customerName;
+        document.getElementById('f_phone').value = j.phone;
+        document.getElementById('f_customerEmail').value = j.customerEmail;
+        document.getElementById('f_lineCustomer').value = j.lineCustomer;
+        document.getElementById('f_issue').value = j.issue;
+        document.getElementById('f_techName').value = j.techName;
+        document.getElementById('f_techEmail').value = j.techEmail;
+        document.getElementById('f_lineTech').value = j.lineTech;
+        document.getElementById('f_repairResult').value = j.repairResult;
+        document.getElementById('f_beforeImg').value = j.beforeImg;
+        document.getElementById('f_afterImg').value = j.afterImg;
+        document.getElementById('f_systemLog').value = j.systemLog;
+      } else {
+        document.getElementById('formMode').value = 'create';
+        document.getElementById('jobModalTitle').textContent = 'เปิดใบงานซ่อมบำรุงใหม่';
+        document.getElementById('jobForm').reset();
+        const nextId = 'S1-MNT-' + (2026000 + jobsData.length + 1);
+        document.getElementById('f_jobId').value = nextId;
+        document.getElementById('f_reportDate').value = getTodayFormatted();
+        document.getElementById('f_status').value = 'รอดำเนินการ';
+        document.getElementById('f_systemLog').value = getNowLogTimestamp('รอดำเนินการ');
+      }
+      document.getElementById('jobModal').classList.remove('hidden');
+      document.getElementById('jobModal').classList.add('flex');
+    }
+    function closeJobModal() { document.getElementById('jobModal').classList.add('hidden'); }
+
+    function saveJobForm(e) {
+      e.preventDefault();
+      const st = document.getElementById('f_status').value;
+      const j = {
+        jobId: document.getElementById('f_jobId').value, reportDate: document.getElementById('f_reportDate').value,
+        customerName: document.getElementById('f_customerName').value, customerEmail: document.getElementById('f_customerEmail').value,
+        phone: document.getElementById('f_phone').value, issue: document.getElementById('f_issue').value, status: st,
+        techName: document.getElementById('f_techName').value, techEmail: document.getElementById('f_techEmail').value,
+        lineTech: document.getElementById('f_lineTech').value, lineCustomer: document.getElementById('f_lineCustomer').value,
+        repairResult: document.getElementById('f_repairResult').value, beforeImg: document.getElementById('f_beforeImg').value,
+        afterImg: document.getElementById('f_afterImg').value, systemLog: getNowLogTimestamp(st)
+      };
+      if (document.getElementById('formMode').value === 'create') jobsData.unshift(j);
+      else { const i = jobsData.findIndex(x => x.jobId === j.jobId); if (i !== -1) jobsData[i] = j; }
+      closeJobModal();
+      postJobAction('createJob', j);
+    }
+
+    const PLACEHOLDER_IMG = 'data:image/svg+xml;utf8,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="400" height="220"><rect width="100%" height="100%" fill="#F1F5F9"/><text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" fill="#64748B" font-family="sans-serif" font-size="14">ไม่มีรูปภาพ</text></svg>');
+
+    function openPrintModal(jobId) {
+      const j = jobsData.find(x => x.jobId === jobId);
+      if (!j) return;
+      document.getElementById('p_jobId').textContent = j.jobId;
+      document.getElementById('p_printDate').textContent = getTodayFormatted();
+      document.getElementById('p_customerName').textContent = j.customerName;
+      document.getElementById('p_reportDate').textContent = j.reportDate;
+      document.getElementById('p_phone').textContent = j.phone;
+      document.getElementById('p_customerEmail').textContent = j.customerEmail || '-';
+      document.getElementById('p_techName').textContent = j.techName || '-';
+      document.getElementById('p_status').textContent = j.status;
+      document.getElementById('p_issue').textContent = j.issue;
+      document.getElementById('p_repairResult').textContent = j.repairResult || 'ตรวจสอบและบำรุงรักษาเรียบร้อยแล้ว';
+      document.getElementById('p_warrantyExpiry').textContent = calculateWarrantyExpiry90Days(j.reportDate);
+      document.getElementById('p_beforeImg').src = convertDriveUrl(j.beforeImg) || PLACEHOLDER_IMG;
+      document.getElementById('p_afterImg').src = convertDriveUrl(j.afterImg) || PLACEHOLDER_IMG;
+      document.getElementById('printModal').classList.remove('hidden');
+      document.getElementById('printModal').classList.add('flex');
+    }
+    function closePrintModal() { document.getElementById('printModal').classList.add('hidden'); }
+
+    function initSig(id) {
+      const c = document.getElementById(id), ctx = c.getContext('2d');
+      let drw = false;
+      ctx.strokeStyle = '#0F172A'; ctx.lineWidth = 2;
+      const getPos = e => { const r = c.getBoundingClientRect(), cx = e.touches ? e.touches[0].clientX : e.clientX, cy = e.touches ? e.touches[0].clientY : e.clientY; return { x: (cx - r.left)*(c.width/r.width), y: (cy - r.top)*(c.height/r.height) }; };
+      c.addEventListener('mousedown', e => { drw = true; const p = getPos(e); ctx.beginPath(); ctx.moveTo(p.x, p.y); });
+      c.addEventListener('mousemove', e => { if(!drw)return; const p = getPos(e); ctx.lineTo(p.x, p.y); ctx.stroke(); });
+      window.addEventListener('mouseup', () => drw = false);
+      c.addEventListener('touchstart', e => { drw = true; const p = getPos(e); ctx.beginPath(); ctx.moveTo(p.x, p.y); e.preventDefault(); }, {passive:false});
+      c.addEventListener('touchmove', e => { if(!drw)return; const p = getPos(e); ctx.lineTo(p.x, p.y); ctx.stroke(); e.preventDefault(); }, {passive:false});
+      c.addEventListener('touchend', () => drw = false);
+    }
+    function clearSignatures() { ['sigCanvasCustomer', 'sigCanvasTech'].forEach(id => { const c = document.getElementById(id); c.getContext('2d').clearRect(0, 0, c.width, c.height); }); }
+
+    window.addEventListener('DOMContentLoaded', () => {
+      initSig('sigCanvasCustomer'); initSig('sigCanvasTech');
+      fetchJobs();
+    });
+  </script>
+</body>
+</html>
