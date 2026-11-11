@@ -524,8 +524,15 @@
         const res = await fetch(url, {
           method: 'POST',
           headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-          body: JSON.stringify({ action: 'sendNotification', party: currentNotifyParty, jobData: currentNotifyJob })
-        });
+body: JSON.stringify({
+  action: 'sendNotification',
+  // ดึงค่าจากช่องกรอกข้อมูลในป๊อปอัป (คุณต้องเปลี่ยนคำใน '...' ให้ตรงกับ ID ใน HTML ของคุณ)
+  customEmailTo: document.getElementById('id_ของช่องอีเมล').value,
+  customEmailSubject: "แจ้งอัปเดตสถานะงานซ่อมบำรุง",
+  customEmailBody: document.getElementById('id_ของกล่องข้อความอีเมล').value,
+  customLineTo: document.getElementById('id_ของช่องรหัสไลน์').value,
+  customLineMessage: document.getElementById('id_ของกล่องข้อความไลน์').value
+})        });
         const resJson = await res.json();
         if (resJson.status === 'success') { showToast('ส่งการแจ้งเตือนสำเร็จ!'); closeNotifyModal(); }
         else { showToast('เกิดข้อผิดพลาด: ' + (resJson.message || '')); }
